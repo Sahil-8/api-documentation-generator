@@ -3,7 +3,7 @@ const path = require("path");
 const SwaggerParser = require("swagger-parser");
 const yaml = require("js-yaml");
 const marked = require("marked");
-const pdf = require("html-pdf");
+const puppeteer = require("puppeteer");
 
 exports.uploadFile = async (req, res) => {
   try {
@@ -46,38 +46,38 @@ exports.uploadFile = async (req, res) => {
       htmlContent = generateGenericJSONHTML(parsedData, req.file.originalname);
     }
 
-    // PDF options
-    const options = {
-      format: "A4",
-      border: { top: "20px", right: "20px", bottom: "20px", left: "20px" },
-      header: {
-        height: "45px",
-        contents:
-          '<div style="text-align: center; font-size: 12px; color: #666; padding: 10px;">API Documentation</div>',
-      },
-      footer: {
-        height: "28px",
-        contents: `<div style="text-align: center; font-size: 10px; color: #666; padding: 10px;">Generated on ${new Date().toLocaleDateString()}</div>`,
-      },
-    };
-
-    // Stream PDF directly
+    // Generate PDF using Puppeteer
     try {
-      pdf.create(htmlContent, options).toStream((err, stream) => {
-        if (err) {
-          console.error("PDF generation error:", err);
-          return res
-            .status(500)
-            .json({ message: "Error generating PDF", error: err.message });
-        }
-
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader(
-          "Content-Disposition",
-          `attachment; filename="${req.file.originalname || "documentation"}.pdf"`
-        );
-        stream.pipe(res);
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
+      
+      const page = await browser.newPage();
+      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+      
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        margin: {
+          top: '20px',
+          right: '20px',
+          bottom: '20px',
+          left: '20px'
+        },
+        printBackground: true,
+        displayHeaderFooter: true,
+        headerTemplate: '<div style="text-align: center; font-size: 12px; color: #666; padding: 10px;">API Documentation</div>',
+        footerTemplate: `<div style="text-align: center; font-size: 10px; color: #666; padding: 10px;">Generated on ${new Date().toLocaleDateString()}</div>`
+      });
+      
+      await browser.close();
+      
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${req.file.originalname || "documentation"}.pdf"`
+      );
+      res.send(pdfBuffer);
     } catch (pdfError) {
       console.error("PDF creation error:", pdfError);
       return res
@@ -112,38 +112,38 @@ exports.generatePDFFromData = async (req, res) => {
       htmlContent = generateGenericJSONHTML(parsedData, fileName);
     }
 
-    // PDF options
-    const options = {
-      format: "A4",
-      border: { top: "20px", right: "20px", bottom: "20px", left: "20px" },
-      header: {
-        height: "45px",
-        contents:
-          '<div style="text-align: center; font-size: 12px; color: #666; padding: 10px;">API Documentation</div>',
-      },
-      footer: {
-        height: "28px",
-        contents: `<div style="text-align: center; font-size: 10px; color: #666; padding: 10px;">Generated on ${new Date().toLocaleDateString()}</div>`,
-      },
-    };
-
-    // Generate PDF and stream it
+    // Generate PDF using Puppeteer
     try {
-      pdf.create(htmlContent, options).toStream((err, stream) => {
-        if (err) {
-          console.error("PDF generation error:", err);
-          return res
-            .status(500)
-            .json({ message: "Error generating PDF", error: err.message });
-        }
-
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader(
-          "Content-Disposition",
-          `attachment; filename="${fileName || "documentation"}.pdf"`
-        );
-        stream.pipe(res);
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
+      
+      const page = await browser.newPage();
+      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+      
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        margin: {
+          top: '20px',
+          right: '20px',
+          bottom: '20px',
+          left: '20px'
+        },
+        printBackground: true,
+        displayHeaderFooter: true,
+        headerTemplate: '<div style="text-align: center; font-size: 12px; color: #666; padding: 10px;">API Documentation</div>',
+        footerTemplate: `<div style="text-align: center; font-size: 10px; color: #666; padding: 10px;">Generated on ${new Date().toLocaleDateString()}</div>`
+      });
+      
+      await browser.close();
+      
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${fileName || "documentation"}.pdf"`
+      );
+      res.send(pdfBuffer);
     } catch (pdfError) {
       console.error("PDF creation error:", pdfError);
       return res

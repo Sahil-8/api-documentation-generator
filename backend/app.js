@@ -69,31 +69,31 @@ app.get("/health", (req, res) => {
 });
 
 // PDF library health check
-app.get("/health/pdf", (req, res) => {
+app.get("/health/pdf", async (req, res) => {
   try {
-    const pdf = require("html-pdf");
-    const testHtml = "<html><body><h1>Test</h1></body></html>";
+    const puppeteer = require("puppeteer");
     
-    pdf.create(testHtml, { format: "A4" }).toBuffer((err, buffer) => {
-      if (err) {
-        res.json({
-          status: "ERROR",
-          pdf: "Failed to generate test PDF",
-          error: err.message,
-          timestamp: new Date().toISOString()
-        });
-      } else {
-        res.json({
-          status: "OK",
-          pdf: "Working correctly",
-          timestamp: new Date().toISOString()
-        });
-      }
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    });
+    
+    const page = await browser.newPage();
+    await page.setContent("<html><body><h1>Test PDF</h1></body></html>");
+    
+    const pdfBuffer = await page.pdf({ format: 'A4' });
+    await browser.close();
+    
+    res.json({
+      status: "OK",
+      pdf: "Working correctly",
+      bufferSize: pdfBuffer.length,
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
     res.json({
       status: "ERROR",
-      pdf: "Library not available",
+      pdf: "Failed to generate test PDF",
       error: error.message,
       timestamp: new Date().toISOString()
     });
