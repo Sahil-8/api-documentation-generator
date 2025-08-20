@@ -46,58 +46,14 @@ exports.uploadFile = async (req, res) => {
       htmlContent = generateGenericJSONHTML(parsedData, req.file.originalname);
     }
 
-    // Generate PDF using jsPDF
-    try {
-      const doc = new jsPDF();
-      
-      // Add header
-      doc.setFontSize(16);
-      doc.text('API Documentation', 20, 20);
-      
-      // Add file name
-      doc.setFontSize(12);
-      doc.text(`File: ${req.file.originalname || "documentation"}`, 20, 35);
-      
-      // Add generation date
-      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 45);
-      
-      // Add content (simplified for jsPDF)
-      doc.setFontSize(10);
-      let yPosition = 60;
-      
-      // Convert HTML content to simple text for PDF
-      const textContent = htmlContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-      
-      // Split text into lines that fit the page width
-      const maxWidth = 170; // A4 width minus margins
-      const lines = doc.splitTextToSize(textContent, maxWidth);
-      
-      // Add text lines to PDF
-      lines.forEach(line => {
-        if (yPosition > 270) { // Check if we need a new page
-          doc.addPage();
-          yPosition = 20;
-        }
-        doc.text(line, 20, yPosition);
-        yPosition += 7;
-      });
-      
-      // Send PDF
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="${req.file.originalname || "documentation"}.pdf"`
-      );
-      
-      // Convert ArrayBuffer to Buffer for Node.js compatibility
-      const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
-      res.end(pdfBuffer);
-    } catch (pdfError) {
-      console.error("PDF creation error:", pdfError);
-      return res
-        .status(500)
-        .json({ message: "Error creating PDF", error: pdfError.message });
-    }
+    // Return parsed data as JSON (not PDF)
+    res.json({
+      message: "File uploaded and parsed successfully",
+      parsedData: parsedData,
+      fileName: req.file.originalname,
+      fileType: ext,
+      htmlContent: htmlContent // Store HTML for later PDF generation
+    });
   } catch (err) {
     console.error("File processing error:", err);
     res
