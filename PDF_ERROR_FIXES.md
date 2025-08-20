@@ -41,7 +41,7 @@
 Create or update `backend/.env` file with:
 
 ```env
-MONGO_URI=mongodb+srv://autodocuser:oSK2Aawy59ohFPGT@cluster0.oposvyk.mongodb.net/?retryWrites=true&w=maj
+MONGO_URI=your_mongodb_connection_string_here
 JWT_SECRET=your_super_secret_jwt_key_here_change_in_production
 PORT=5000
 NODE_ENV=development
