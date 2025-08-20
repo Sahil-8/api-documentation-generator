@@ -106,28 +106,42 @@ export default function Dashboard() {
       });
 
       if (response.ok) {
-        // Get the PDF blob
-        const blob = await response.blob();
-        
-        // Create download link
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = `${selectedFile?.name || 'documentation'}.pdf`;
-        
-        // Trigger download
-        document.body.appendChild(a);
-        a.click();
-        
-        // Cleanup
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        setSuccess("PDF downloaded successfully!");
+        // Check if response is actually a PDF
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/pdf')) {
+          // Get the PDF blob
+          const blob = await response.blob();
+          
+          // Create download link
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = `${selectedFile?.name || 'documentation'}.pdf`;
+          
+          // Trigger download
+          document.body.appendChild(a);
+          a.click();
+          
+          // Cleanup
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+          
+          setSuccess("PDF downloaded successfully!");
+        } else {
+          // Handle non-PDF response
+          const data = await response.json();
+          setError(data.message || "Unexpected response format");
+        }
       } else {
-        const data = await response.json();
-        setError(data.message || "Failed to generate PDF");
+        // Handle error response - check if it's JSON or PDF
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          setError(data.message || "Failed to generate PDF");
+        } else {
+          setError("Failed to generate PDF - unexpected response format");
+        }
       }
     } catch (err) {
       console.error('PDF generation error:', err);
