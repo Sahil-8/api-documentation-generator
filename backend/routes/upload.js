@@ -1,22 +1,27 @@
-const express = require("express");
-const router = express.Router();
-const upload = require("../middleware/upload");
-const uploadController = require("../controllers/uploadController");
-const authMiddleware = require("../middleware/auth");
+const multer = require("multer");
+const path = require("path");
 
-// Upload file (field name must be 'file')
-router.post(
-  "/",
-  authMiddleware,
-  upload.single("file"),
-  uploadController.uploadFile
-);
+// Storage configuration
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads/"); // make sure this folder exists
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
+});
 
-// Generate PDF from parsed data
-router.post(
-  "/generate-pdf",
-  authMiddleware,
-  uploadController.generatePDFFromData
-);
+// File filter (optional)
+const fileFilter = (req, file, cb) => {
+  // Accept only JSON files (example)
+  if (file.mimetype === "application/json") {
+    cb(null, true);
+  } else {
+    cb(new Error("Only JSON files allowed"), false);
+  }
+};
 
-module.exports = router;
+// Multer instance
+const upload = multer({ storage, fileFilter });
+
+module.exports = upload;
