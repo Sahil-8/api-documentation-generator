@@ -3,7 +3,7 @@ const path = require("path");
 const SwaggerParser = require("swagger-parser");
 const yaml = require("js-yaml");
 const marked = require("marked");
-const puppeteer = require("puppeteer");
+const jsPDF = require("jspdf");
 
 exports.uploadFile = async (req, res) => {
   try {
@@ -46,38 +46,49 @@ exports.uploadFile = async (req, res) => {
       htmlContent = generateGenericJSONHTML(parsedData, req.file.originalname);
     }
 
-    // Generate PDF using Puppeteer
+    // Generate PDF using jsPDF
     try {
-      const browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      const doc = new jsPDF();
+      
+      // Add header
+      doc.setFontSize(16);
+      doc.text('API Documentation', 20, 20);
+      
+      // Add file name
+      doc.setFontSize(12);
+      doc.text(`File: ${req.file.originalname || "documentation"}`, 20, 35);
+      
+      // Add generation date
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 45);
+      
+      // Add content (simplified for jsPDF)
+      doc.setFontSize(10);
+      let yPosition = 60;
+      
+      // Convert HTML content to simple text for PDF
+      const textContent = htmlContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      
+      // Split text into lines that fit the page width
+      const maxWidth = 170; // A4 width minus margins
+      const lines = doc.splitTextToSize(textContent, maxWidth);
+      
+      // Add text lines to PDF
+      lines.forEach(line => {
+        if (yPosition > 270) { // Check if we need a new page
+          doc.addPage();
+          yPosition = 20;
+        }
+        doc.text(line, 20, yPosition);
+        yPosition += 7;
       });
       
-      const page = await browser.newPage();
-      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-      
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        margin: {
-          top: '20px',
-          right: '20px',
-          bottom: '20px',
-          left: '20px'
-        },
-        printBackground: true,
-        displayHeaderFooter: true,
-        headerTemplate: '<div style="text-align: center; font-size: 12px; color: #666; padding: 10px;">API Documentation</div>',
-        footerTemplate: `<div style="text-align: center; font-size: 10px; color: #666; padding: 10px;">Generated on ${new Date().toLocaleDateString()}</div>`
-      });
-      
-      await browser.close();
-      
+      // Send PDF
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
         "Content-Disposition",
         `attachment; filename="${req.file.originalname || "documentation"}.pdf"`
       );
-      res.send(pdfBuffer);
+      res.end(doc.output('arraybuffer'));
     } catch (pdfError) {
       console.error("PDF creation error:", pdfError);
       return res
@@ -112,38 +123,49 @@ exports.generatePDFFromData = async (req, res) => {
       htmlContent = generateGenericJSONHTML(parsedData, fileName);
     }
 
-    // Generate PDF using Puppeteer
+    // Generate PDF using jsPDF
     try {
-      const browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      const doc = new jsPDF();
+      
+      // Add header
+      doc.setFontSize(16);
+      doc.text('API Documentation', 20, 20);
+      
+      // Add file name
+      doc.setFontSize(12);
+      doc.text(`File: ${fileName || "documentation"}`, 20, 35);
+      
+      // Add generation date
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 45);
+      
+      // Add content (simplified for jsPDF)
+      doc.setFontSize(10);
+      let yPosition = 60;
+      
+      // Convert HTML content to simple text for PDF
+      const textContent = htmlContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      
+      // Split text into lines that fit the page width
+      const maxWidth = 170; // A4 width minus margins
+      const lines = doc.splitTextToSize(textContent, maxWidth);
+      
+      // Add text lines to PDF
+      lines.forEach(line => {
+        if (yPosition > 270) { // Check if we need a new page
+          doc.addPage();
+          yPosition = 20;
+        }
+        doc.text(line, 20, yPosition);
+        yPosition += 7;
       });
       
-      const page = await browser.newPage();
-      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-      
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        margin: {
-          top: '20px',
-          right: '20px',
-          bottom: '20px',
-          left: '20px'
-        },
-        printBackground: true,
-        displayHeaderFooter: true,
-        headerTemplate: '<div style="text-align: center; font-size: 12px; color: #666; padding: 10px;">API Documentation</div>',
-        footerTemplate: `<div style="text-align: center; font-size: 10px; color: #666; padding: 10px;">Generated on ${new Date().toLocaleDateString()}</div>`
-      });
-      
-      await browser.close();
-      
+      // Send PDF
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
         "Content-Disposition",
         `attachment; filename="${fileName || "documentation"}.pdf"`
       );
-      res.send(pdfBuffer);
+      res.end(doc.output('arraybuffer'));
     } catch (pdfError) {
       console.error("PDF creation error:", pdfError);
       return res

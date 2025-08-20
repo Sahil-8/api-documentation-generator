@@ -69,25 +69,18 @@ app.get("/health", (req, res) => {
 });
 
 // PDF library health check
-app.get("/health/pdf", async (req, res) => {
+app.get("/health/pdf", (req, res) => {
   try {
-    const puppeteer = require("puppeteer");
+    const jsPDF = require("jspdf");
     
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-    });
-    
-    const page = await browser.newPage();
-    await page.setContent("<html><body><h1>Test PDF</h1></body></html>");
-    
-    const pdfBuffer = await page.pdf({ format: 'A4' });
-    await browser.close();
+    const doc = new jsPDF();
+    doc.text("Test PDF", 20, 20);
+    const pdfBuffer = doc.output('arraybuffer');
     
     res.json({
       status: "OK",
       pdf: "Working correctly",
-      bufferSize: pdfBuffer.length,
+      bufferSize: pdfBuffer.byteLength,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
