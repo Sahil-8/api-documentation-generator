@@ -316,5 +316,3 @@ If you encounter any issues or have questions:
 - [ ] User activity analytics
 
 ---
-
-**Built with ❤️ using React, Node.js, and MongoDB**
