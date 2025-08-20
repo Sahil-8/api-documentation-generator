@@ -56,9 +56,20 @@ exports.uploadFile = async (req, res) => {
     });
   } catch (err) {
     console.error("File processing error:", err);
+    
+    // Clean up uploaded file if it exists
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+        console.log("Cleaned up uploaded file:", req.file.path);
+      } catch (cleanupError) {
+        console.error("Failed to cleanup file:", cleanupError);
+      }
+    }
+    
     res
       .status(500)
-      .json({ message: "Error parsing or generating PDF", error: err.message });
+      .json({ message: "Error parsing file", error: err.message });
   }
 };
 
@@ -68,6 +79,15 @@ exports.generatePDFFromData = async (req, res) => {
     
     if (!parsedData) {
       return res.status(400).json({ message: "No parsed data provided" });
+    }
+
+    // Validate parsedData format
+    if (typeof parsedData !== 'object' && typeof parsedData !== 'string') {
+      return res.status(400).json({ message: "Invalid parsed data format" });
+    }
+
+    if (!fileName || typeof fileName !== 'string') {
+      return res.status(400).json({ message: "Invalid filename provided" });
     }
 
     // Build HTML content based on the parsed data
