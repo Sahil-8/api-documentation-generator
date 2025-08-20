@@ -88,7 +88,10 @@ exports.uploadFile = async (req, res) => {
         "Content-Disposition",
         `attachment; filename="${req.file.originalname || "documentation"}.pdf"`
       );
-      res.end(doc.output('arraybuffer'));
+      
+      // Convert ArrayBuffer to Buffer for Node.js compatibility
+      const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+      res.end(pdfBuffer);
     } catch (pdfError) {
       console.error("PDF creation error:", pdfError);
       return res
@@ -165,7 +168,10 @@ exports.generatePDFFromData = async (req, res) => {
         "Content-Disposition",
         `attachment; filename="${fileName || "documentation"}.pdf"`
       );
-      res.end(doc.output('arraybuffer'));
+      
+      // Convert ArrayBuffer to Buffer for Node.js compatibility
+      const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+      res.end(pdfBuffer);
     } catch (pdfError) {
       console.error("PDF creation error:", pdfError);
       return res
