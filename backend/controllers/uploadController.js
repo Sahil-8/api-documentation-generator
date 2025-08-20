@@ -1,124 +1,97 @@
-const fs = require('fs');
-const path = require('path');
-const SwaggerParser = require('swagger-parser');
-const yaml = require('js-yaml');
-const marked = require('marked');
-const pdf = require('html-pdf');
+const fs = require("fs");
+const path = require("path");
+const SwaggerParser = require("swagger-parser");
+const yaml = require("js-yaml");
+const marked = require("marked");
+const pdf = require("html-pdf");
 
 exports.uploadFile = async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     const filePath = req.file.path;
     const ext = path.extname(filePath).toLowerCase();
-
+    const fileContent = fs.readFileSync(filePath, "utf8");
     let parsedData = null;
-    let fileContent = fs.readFileSync(filePath, 'utf8');
 
-    if (ext === '.json') {
-      // Try Swagger/OpenAPI or Postman JSON
+    // Parse file content
+    if (ext === ".json") {
       try {
         parsedData = await SwaggerParser.parse(filePath);
       } catch (e) {
-        // Not a Swagger file, try as Postman or plain JSON
         parsedData = JSON.parse(fileContent);
       }
-    } else if (ext === '.yaml' || ext === '.yml') {
+    } else if (ext === ".yaml" || ext === ".yml") {
       const doc = yaml.load(fileContent);
       try {
         parsedData = await SwaggerParser.parse(doc);
       } catch (e) {
         parsedData = doc;
       }
-    } else if (ext === '.md') {
+    } else if (ext === ".md") {
       parsedData = marked.parse(fileContent);
     } else {
-      return res.status(400).json({ message: 'Unsupported file type' });
+      return res.status(400).json({ message: "Unsupported file type" });
     }
 
-    // You can save parsedData to MongoDB here if you want
-
-    res.json({
-      message: 'File uploaded and parsed successfully',
-      parsedData
-    });
-  } catch (err) {
-    res.status(500).json({ message: 'Error parsing file', error: err.message });
-  }
-};
-
-exports.generatePDF = async (req, res) => {
-  try {
-    const { parsedData, fileName } = req.body;
-    
-    if (!parsedData) {
-      return res.status(400).json({ message: 'No data provided for PDF generation' });
-    }
-
-    let htmlContent = '';
-
-    // Generate HTML content based on the type of data
-    if (typeof parsedData === 'string') {
-      // Markdown content
-      htmlContent = generateMarkdownHTML(parsedData, fileName);
-    } else if (parsedData.info && parsedData.info.schema && parsedData.info.schema.includes("postman")) {
-      // Postman Collection
-      htmlContent = generatePostmanHTML(parsedData, fileName);
+    // Build HTML content
+    let htmlContent = "";
+    if (typeof parsedData === "string") {
+      htmlContent = generateMarkdownHTML(parsedData, req.file.originalname);
+    } else if (parsedData.info && parsedData.info.schema?.includes("postman")) {
+      htmlContent = generatePostmanHTML(parsedData, req.file.originalname);
     } else if (parsedData.openapi || parsedData.swagger) {
-      // Swagger/OpenAPI
-      htmlContent = generateSwaggerHTML(parsedData, fileName);
+      htmlContent = generateSwaggerHTML(parsedData, req.file.originalname);
     } else {
-      // Generic JSON
-      htmlContent = generateGenericJSONHTML(parsedData, fileName);
+      htmlContent = generateGenericJSONHTML(parsedData, req.file.originalname);
     }
 
     // PDF options
     const options = {
-      format: 'A4',
-      border: {
-        top: '20px',
-        right: '20px',
-        bottom: '20px',
-        left: '20px'
-      },
+      format: "A4",
+      border: { top: "20px", right: "20px", bottom: "20px", left: "20px" },
       header: {
-        height: '45px',
-        contents: '<div style="text-align: center; font-size: 12px; color: #666; padding: 10px;">API Documentation</div>'
+        height: "45px",
+        contents:
+          '<div style="text-align: center; font-size: 12px; color: #666; padding: 10px;">API Documentation</div>',
       },
       footer: {
-        height: '28px',
-        contents: '<div style="text-align: center; font-size: 10px; color: #666; padding: 10px;">Generated on ' + new Date().toLocaleDateString() + '</div>'
-      }
+        height: "28px",
+        contents: `<div style="text-align: center; font-size: 10px; color: #666; padding: 10px;">Generated on ${new Date().toLocaleDateString()}</div>`,
+      },
     };
 
-    // Generate PDF
-    pdf.create(htmlContent, options).toBuffer((err, buffer) => {
+    // Stream PDF directly
+    pdf.create(htmlContent, options).toStream((err, stream) => {
       if (err) {
-        return res.status(500).json({ message: 'Error generating PDF', error: err.message });
+        return res
+          .status(500)
+          .json({ message: "Error generating PDF", error: err.message });
       }
 
-      // Set response headers
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${fileName || 'documentation'}.pdf"`);
-      res.setHeader('Content-Length', buffer.length);
-
-      // Send the PDF buffer
-      res.send(buffer);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${req.file.originalname || "documentation"}.pdf"`
+      );
+      stream.pipe(res);
     });
-
   } catch (err) {
-    res.status(500).json({ message: 'Error generating PDF', error: err.message });
+    res
+      .status(500)
+      .json({ message: "Error parsing or generating PDF", error: err.message });
   }
 };
 
-// Helper functions to generate HTML for different content types
+// ---------------- Helper functions ----------------
+
 function generateMarkdownHTML(content, fileName) {
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
-      <title>${fileName || 'Documentation'}</title>
+      <title>${fileName || "Documentation"}</title>
       <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; }
         h1, h2, h3, h4, h5, h6 { color: #333; margin-top: 20px; margin-bottom: 10px; }
@@ -137,7 +110,7 @@ function generateMarkdownHTML(content, fileName) {
       </style>
     </head>
     <body>
-      <h1>${fileName || 'Documentation'}</h1>
+      <h1>${fileName || "Documentation"}</h1>
       ${content}
     </body>
     </html>
@@ -150,7 +123,7 @@ function generatePostmanHTML(data, fileName) {
     <html>
     <head>
       <meta charset="utf-8">
-      <title>${data.info?.name || 'Postman Collection'}</title>
+      <title>${data.info?.name || "Postman Collection"}</title>
       <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; }
         h1, h2, h3, h4 { color: #333; margin-top: 20px; margin-bottom: 10px; }
@@ -170,17 +143,18 @@ function generatePostmanHTML(data, fileName) {
       </style>
     </head>
     <body>
-      <h1>${data.info?.name || 'Postman Collection'}</h1>
-      <p><strong>Collection ID:</strong> ${data.info?._postman_id || 'N/A'}</p>
+      <h1>${data.info?.name || "Postman Collection"}</h1>
+      <p><strong>Collection ID:</strong> ${data.info?._postman_id || "N/A"}</p>
   `;
 
   if (data.item && data.item.length > 0) {
-    html += '<h2>API Requests</h2>';
-    data.item.forEach((item, index) => {
-      const method = item.request?.method || 'UNKNOWN';
+    html += "<h2>API Requests</h2>";
+    data.item.forEach((item) => {
+      const method = item.request?.method || "UNKNOWN";
       const methodClass = method.toLowerCase();
-      const url = item.request?.url?.raw || item.request?.url?.host?.join('/') || 'N/A';
-      
+      const url =
+        item.request?.url?.raw || item.request?.url?.host?.join("/") || "N/A";
+
       html += `
         <div class="request">
           <h3>${item.name}</h3>
@@ -190,27 +164,27 @@ function generatePostmanHTML(data, fileName) {
           </div>
       `;
 
-      // Headers
-      if (item.request?.header && item.request.header.length > 0) {
+      if (item.request?.header?.length) {
         html += '<div class="section"><h4>Headers</h4>';
-        item.request.header.forEach(header => {
+        item.request.header.forEach((header) => {
           html += `<div class="header-item"><strong>${header.key}:</strong> ${header.value}</div>`;
         });
-        html += '</div>';
+        html += "</div>";
       }
 
-      // Body
       if (item.request?.body) {
         html += '<div class="section"><h4>Request Body</h4>';
-        html += `<pre>${item.request.body.raw || JSON.stringify(item.request.body, null, 2)}</pre>`;
-        html += '</div>';
+        html += `<pre>${
+          item.request.body.raw || JSON.stringify(item.request.body, null, 2)
+        }</pre>`;
+        html += "</div>";
       }
 
-      html += '</div>';
+      html += "</div>";
     });
   }
 
-  html += '</body></html>';
+  html += "</body></html>";
   return html;
 }
 
@@ -220,7 +194,7 @@ function generateSwaggerHTML(data, fileName) {
     <html>
     <head>
       <meta charset="utf-8">
-      <title>${data.info?.title || 'API Documentation'}</title>
+      <title>${data.info?.title || "API Documentation"}</title>
       <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; }
         h1, h2, h3, h4 { color: #333; margin-top: 20px; margin-bottom: 10px; }
@@ -243,65 +217,67 @@ function generateSwaggerHTML(data, fileName) {
       </style>
     </head>
     <body>
-      <h1>${data.info?.title || 'API Documentation'}</h1>
-      <p><strong>Version:</strong> ${data.info?.version || 'N/A'}</p>
-      ${data.info?.description ? `<p>${data.info.description}</p>` : ''}
+      <h1>${data.info?.title || "API Documentation"}</h1>
+      <p><strong>Version:</strong> ${data.info?.version || "N/A"}</p>
+      ${data.info?.description ? `<p>${data.info.description}</p>` : ""}
   `;
 
-  // Servers
-  if (data.servers && data.servers.length > 0) {
-    html += '<h2>Servers</h2>';
-    data.servers.forEach((server, index) => {
+  if (data.servers?.length) {
+    html += "<h2>Servers</h2>";
+    data.servers.forEach((server) => {
       html += `
         <div class="server">
           <strong>${server.url}</strong>
-          ${server.description ? `<br><small>${server.description}</small>` : ''}
+          ${
+            server.description ? `<br><small>${server.description}</small>` : ""
+          }
         </div>
       `;
     });
   }
 
-  // Endpoints
   if (data.paths) {
-    html += '<h2>Endpoints</h2>';
+    html += "<h2>Endpoints</h2>";
     Object.entries(data.paths).forEach(([path, methods]) => {
       html += `<div class="endpoint"><h3 class="path">${path}</h3>`;
-      
+
       Object.entries(methods).forEach(([method, details]) => {
         const methodClass = method.toLowerCase();
         html += `
           <div class="section">
             <span class="method ${methodClass}">${method.toUpperCase()}</span>
-            <strong>${details.summary || 'No summary'}</strong>
-            ${details.description ? `<p>${details.description}</p>` : ''}
+            <strong>${details.summary || "No summary"}</strong>
+            ${details.description ? `<p>${details.description}</p>` : ""}
         `;
 
-        // Parameters
-        if (details.parameters && details.parameters.length > 0) {
-          html += '<h4>Parameters</h4><table><tr><th>Name</th><th>Type</th><th>Location</th><th>Required</th></tr>';
-          details.parameters.forEach(param => {
-            html += `<tr><td>${param.name}</td><td>${param.schema?.type || 'string'}</td><td>${param.in}</td><td>${param.required ? 'Yes' : 'No'}</td></tr>`;
+        if (details.parameters?.length) {
+          html +=
+            "<h4>Parameters</h4><table><tr><th>Name</th><th>Type</th><th>Location</th><th>Required</th></tr>";
+          details.parameters.forEach((param) => {
+            html += `<tr><td>${param.name}</td><td>${
+              param.schema?.type || "string"
+            }</td><td>${param.in}</td><td>${
+              param.required ? "Yes" : "No"
+            }</td></tr>`;
           });
-          html += '</table>';
+          html += "</table>";
         }
 
-        // Responses
         if (details.responses) {
-          html += '<h4>Responses</h4>';
+          html += "<h4>Responses</h4>";
           Object.entries(details.responses).forEach(([code, response]) => {
             html += `<div><strong>${code}</strong>: ${response.description}</div>`;
           });
         }
 
-        html += '</div>';
+        html += "</div>";
       });
-      html += '</div>';
+      html += "</div>";
     });
   }
 
-  // Schemas
   if (data.components?.schemas) {
-    html += '<h2>Data Models</h2>';
+    html += "<h2>Data Models</h2>";
     Object.entries(data.components.schemas).forEach(([name, schema]) => {
       html += `
         <div class="endpoint">
@@ -312,7 +288,7 @@ function generateSwaggerHTML(data, fileName) {
     });
   }
 
-  html += '</body></html>';
+  html += "</body></html>";
   return html;
 }
 
@@ -322,7 +298,7 @@ function generateGenericJSONHTML(data, fileName) {
     <html>
     <head>
       <meta charset="utf-8">
-      <title>${fileName || 'Data Structure'}</title>
+      <title>${fileName || "Data Structure"}</title>
       <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; }
         h1, h2, h3 { color: #333; margin-top: 20px; margin-bottom: 10px; }
@@ -334,22 +310,19 @@ function generateGenericJSONHTML(data, fileName) {
       </style>
     </head>
     <body>
-      <h1>${fileName || 'Data Structure'}</h1>
+      <h1>${fileName || "Data Structure"}</h1>
   `;
 
   Object.entries(data).forEach(([key, value]) => {
     html += `
       <div class="section">
         <h3>${key}</h3>
-        ${Array.isArray(value) ? 
-          `<p>Array with ${value.length} items</p>` : 
-          ''
-        }
+        ${Array.isArray(value) ? `<p>Array with ${value.length} items</p>` : ""}
         <pre>${JSON.stringify(value, null, 2)}</pre>
       </div>
     `;
   });
 
-  html += '</body></html>';
+  html += "</body></html>";
   return html;
 }
