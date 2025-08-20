@@ -71,7 +71,7 @@ app.get("/health", (req, res) => {
 // PDF library health check
 app.get("/health/pdf", (req, res) => {
   try {
-    const jsPDF = require("jspdf");
+    const { jsPDF } = require("jspdf");
     
     const doc = new jsPDF();
     doc.text("Test PDF", 20, 20);

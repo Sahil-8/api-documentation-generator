@@ -3,7 +3,7 @@ const path = require("path");
 const SwaggerParser = require("swagger-parser");
 const yaml = require("js-yaml");
 const marked = require("marked");
-const jsPDF = require("jspdf");
+const { jsPDF } = require("jspdf");
 
 exports.uploadFile = async (req, res) => {
   try {
