@@ -68,6 +68,38 @@ app.get("/health", (req, res) => {
   });
 });
 
+// PDF library health check
+app.get("/health/pdf", (req, res) => {
+  try {
+    const pdf = require("html-pdf");
+    const testHtml = "<html><body><h1>Test</h1></body></html>";
+    
+    pdf.create(testHtml, { format: "A4" }).toBuffer((err, buffer) => {
+      if (err) {
+        res.json({
+          status: "ERROR",
+          pdf: "Failed to generate test PDF",
+          error: err.message,
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        res.json({
+          status: "OK",
+          pdf: "Working correctly",
+          timestamp: new Date().toISOString()
+        });
+      }
+    });
+  } catch (error) {
+    res.json({
+      status: "ERROR",
+      pdf: "Library not available",
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // 404 handler LAST:
 app.use("*", (req, res) => {
   res.status(404).json({ error: "Route not found" });

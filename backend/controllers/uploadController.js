@@ -62,24 +62,99 @@ exports.uploadFile = async (req, res) => {
     };
 
     // Stream PDF directly
-    pdf.create(htmlContent, options).toStream((err, stream) => {
-      if (err) {
-        return res
-          .status(500)
-          .json({ message: "Error generating PDF", error: err.message });
-      }
+    try {
+      pdf.create(htmlContent, options).toStream((err, stream) => {
+        if (err) {
+          console.error("PDF generation error:", err);
+          return res
+            .status(500)
+            .json({ message: "Error generating PDF", error: err.message });
+        }
 
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="${req.file.originalname || "documentation"}.pdf"`
-      );
-      stream.pipe(res);
-    });
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${req.file.originalname || "documentation"}.pdf"`
+        );
+        stream.pipe(res);
+      });
+    } catch (pdfError) {
+      console.error("PDF creation error:", pdfError);
+      return res
+        .status(500)
+        .json({ message: "Error creating PDF", error: pdfError.message });
+    }
   } catch (err) {
+    console.error("File processing error:", err);
     res
       .status(500)
       .json({ message: "Error parsing or generating PDF", error: err.message });
+  }
+};
+
+exports.generatePDFFromData = async (req, res) => {
+  try {
+    const { parsedData, fileName } = req.body;
+    
+    if (!parsedData) {
+      return res.status(400).json({ message: "No parsed data provided" });
+    }
+
+    // Build HTML content based on the parsed data
+    let htmlContent = "";
+    if (typeof parsedData === "string") {
+      htmlContent = generateMarkdownHTML(parsedData, fileName);
+    } else if (parsedData.info && parsedData.info.schema?.includes("postman")) {
+      htmlContent = generatePostmanHTML(parsedData, fileName);
+    } else if (parsedData.openapi || parsedData.swagger) {
+      htmlContent = generateSwaggerHTML(parsedData, fileName);
+    } else {
+      htmlContent = generateGenericJSONHTML(parsedData, fileName);
+    }
+
+    // PDF options
+    const options = {
+      format: "A4",
+      border: { top: "20px", right: "20px", bottom: "20px", left: "20px" },
+      header: {
+        height: "45px",
+        contents:
+          '<div style="text-align: center; font-size: 12px; color: #666; padding: 10px;">API Documentation</div>',
+      },
+      footer: {
+        height: "28px",
+        contents: `<div style="text-align: center; font-size: 10px; color: #666; padding: 10px;">Generated on ${new Date().toLocaleDateString()}</div>`,
+      },
+    };
+
+    // Generate PDF and stream it
+    try {
+      pdf.create(htmlContent, options).toStream((err, stream) => {
+        if (err) {
+          console.error("PDF generation error:", err);
+          return res
+            .status(500)
+            .json({ message: "Error generating PDF", error: err.message });
+        }
+
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${fileName || "documentation"}.pdf"`
+        );
+        stream.pipe(res);
+      });
+    } catch (pdfError) {
+      console.error("PDF creation error:", pdfError);
+      return res
+        .status(500)
+        .json({ message: "Error creating PDF", error: pdfError.message });
+    }
+  } catch (err) {
+    console.error("PDF generation error:", err);
+    res
+      .status(500)
+      .json({ message: "Error generating PDF", error: err.message });
   }
 };
 
